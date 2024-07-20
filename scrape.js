@@ -26,13 +26,17 @@ async function parsePage(url) {
         const $ = cheerio.load(response.data);
 
         const companyData = [];
+        const rows = $('table.ts1 tr');
 
-        $('table.ts1 tr').each((index, element) => {
+        console.log(`Found ${rows.length} rows`);
+
+        rows.each((index, element) => {
             if (index === 0) return; // Skip the header row
             const columns = $(element).find('td');
             if (columns.length > 1) { // Ensure it's not an empty row
                 const companyName = $(columns[0]).text().trim();
                 const companyLink = $(columns[0]).find('a').attr('href');
+                console.log(`Found company: ${companyName}, link: ${companyLink}`);
                 companyData.push({ name: companyName, link: companyLink });
             }
         });
