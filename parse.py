@@ -2,10 +2,24 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
-def parse_page(url):
+def get_final_url(url):
     try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response = requests.get(url, allow_redirects=False)
+        if response.is_redirect:
+            return response.headers['Location']
+        return url
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+        return None
+
+def parse_page(url):
+    final_url = get_final_url(url)
+    if not final_url:
+        return []
+
+    try:
+        response = requests.get(final_url)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # Find the table containing the company information
