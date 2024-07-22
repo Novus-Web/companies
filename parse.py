@@ -1,62 +1,54 @@
-import requests
+# file: app.py
+from flask import Flask, request, render_template_string
 from bs4 import BeautifulSoup
 import json
 
-def get_final_url(url):
-    try:
-        response = requests.get(url, allow_redirects=False)
-        if response.is_redirect:
-            return response.headers['Location']
-        return url
-    except requests.exceptions.RequestException as e:
-        print(f"Request failed: {e}")
-        return None
+app = Flask(__name__)
 
-def parse_page(url):
-    final_url = get_final_url(url)
-    if not final_url:
-        return []
+html_template = """
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>HTML Data Extractor</title>
+  </head>
+  <body>
+    <h1>Paste your HTML code here</h1>
+    <form method="POST" action="/">
+      <textarea name="html_content" rows="20" cols="100"></textarea><br>
+      <input type="submit" value="Extract Data-Href">
+    </form>
+    {% if data %}
+    <h2>Extracted Data</h2>
+    <pre>{{ data }}</pre>
+    {% endif %}
+  </body>
+</html>
+"""
 
-    try:
-        response = requests.get(final_url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Find the table containing the company information
-        table = soup.find('table', {'class': 'ts1'})
-        company_data = []
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    data = None
+    if request.method == 'POST':
+        html_content = request.form['html_content']
+        soup = BeautifulSoup(html_content, 'html.parser')
+        tbody = soup.find('tbody')
+        extracted_data = []
 
-        # Iterate through each row in the table, except the header row
-        for row in table.find_all('tr')[1:]:
-            columns = row.find_all('td')
-            if len(columns) > 1:  # Ensure it's not an empty row
-                company_name = columns[0].get_text(strip=True)
-                company_link = columns[0].find('a')['href']
-                company_data.append({
-                    'name': company_name,
-                    'link': company_link
-                })
+        if tbody:
+            for row in tbody.find_all('tr'):
+                td = row.find('td', class_='clickable-row')
+                if td and 'data-href' in td.attrs:
+                    data_href = td['data-href']
+                    parts = data_href.rsplit('-', 1)
+                    name = parts[0]
+                    number = parts[1] if len(parts) > 1 else ''
+                    extracted_data.append({"name": name, "number": number})
 
-        return company_data
-    except requests.exceptions.RequestException as e:
-        print(f"Request failed: {e}")
-        return []
+            data = json.dumps(extracted_data, indent=2)
+        else:
+            data = "No <tbody> element found in the provided HTML."
 
-def scrape_all_pages():
-    base_url = "https://www.listafirme.ro/hunedoara/petrosani/"
-    all_company_details = []
-    for page_number in range(1, 2):  # Adjust range as needed
-        page_url = f"{base_url}o{page_number}.htm"
-        print(f"Scraping page: {page_url}")
-        company_details = parse_page(page_url)
-        all_company_details.extend(company_details)
-    return all_company_details
+    return render_template_string(html_template, data=data)
 
-def save_to_json(data, filename):
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-if __name__ == "__main__":
-    all_company_details = scrape_all_pages()
-    save_to_json(all_company_details, 'company_data.json')
-    print(f"Data saved to company_data.json")
+if __name__ == '__main__':
+    app.run(debug=True)
