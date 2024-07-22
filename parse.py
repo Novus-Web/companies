@@ -1,4 +1,3 @@
-# file: app.py
 from flask import Flask, request, render_template_string
 from bs4 import BeautifulSoup
 import json
@@ -51,4 +50,4 @@ def index():
     return render_template_string(html_template, data=data)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='3.70.230.76', port=5000, debug=True)
