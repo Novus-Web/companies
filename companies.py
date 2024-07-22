@@ -1,56 +1,32 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import time
 
-base_url = "https://www.listafirme.ro/hunedoara/petrosani/"
-page_pattern = "o{}.htm"
+# Step 1: Fetch the web page
+url = "https://www.listafirme.ro/hunedoara/petrosani/o1.htm"
+response = requests.get(url)
+response.raise_for_status()
 
-def parse_page(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    company_links = []
-    for link in soup.find_all('a', href=True):
-        href = link['href']
-        if "detalii" in href:  # Adjust this condition based on the actual link pattern
-            company_links.append(href)
-    
-    return company_links
+# Step 2: Parse the HTML content
+soup = BeautifulSoup(response.content, 'html.parser')
 
-def scrape_company_details(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    name = soup.find('h1').text.strip()
-    cui = None
-    for td in soup.find_all('td'):
-        if "CUI:" in td.text:
-            cui = td.findNext('td').text.strip()
-            break
-    
-    return {
-        "name": name,
-        "cui": cui,
-    }
+# Step 3: Locate the relevant section
+tbody = soup.find('tbody')
 
-def scrape_all_pages():
-    all_company_details = []
-    for page_num in range(1, 30):
-        page_url = base_url + page_pattern.format(page_num)
-        print(f"Scraping page: {page_url}")
-        company_links = parse_page(page_url)
-        
-        for company_link in company_links:
-            print(f"Scraping company: {company_link}")
-            details = scrape_company_details(company_link)
-            all_company_details.append(details)
-            time.sleep(1)  # Respectful scraping, avoid getting blocked
-        
-    return all_company_details
+# Step 4: Extract the data-href values
+data = []
+for row in tbody.find_all('tr'):
+    td = row.find('td', class_='clickable-row')
+    if td and 'data-href' in td.attrs:
+        data_href = td['data-href']
+        # Split into name and number
+        parts = data_href.rsplit('-', 1)
+        name = parts[0]
+        number = parts[1] if len(parts) > 1 else ''
+        data.append({"name": name, "number": number})
 
-if __name__ == "__main__":
-    all_company_details = scrape_all_pages()
-    with open('company_details.json', 'w', encoding='utf-8') as f:
-        json.dump(all_company_details, f, ensure_ascii=False, indent=4)
-    print("Scraping completed and saved to company_details.json")
+# Step 5: Save the data to a JSON file
+with open('extracted_data.json', 'w') as json_file:
+    json.dump(data, json_file, indent=2)
+
+print("Data extracted and saved to extracted_data.json")
